@@ -1,2 +1,3 @@
 #define GABLOG_IMPLEMENTATION
+#define GABPROFILER_IMPLEMENTATION
 #include "gablog.h"
