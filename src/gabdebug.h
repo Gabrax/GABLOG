@@ -167,7 +167,7 @@ static inline const char* gablog_strip_filename(const char* path)
     return slash ? slash + 1 : path;
 }
 
-static inline const char* LevelToString(const LogLevel level)
+static const char* LevelToString(const LogLevel level)
 {
     switch (level)
     {
@@ -180,7 +180,7 @@ static inline const char* LevelToString(const LogLevel level)
     }
 }
 
-static inline const char* LevelColor(const LogLevel level)
+static const char* LevelColor(const LogLevel level)
 {
     if (!g_UseColor)
         return "";
@@ -258,6 +258,19 @@ typedef struct GABProfileNode
     struct GABProfileNode* nextSibling;
 } GABProfileNode;
 
+#define GAB_MAX_NODES 2048
+#define GAB_MAX_THREADS 64
+
+typedef struct
+{
+    GABProfileNode nodes[GAB_MAX_NODES];
+    unsigned int nodeCount;
+
+    GABProfileNode* current;
+    GABProfileNode* firstRoot;
+    GABProfileNode* lastRoot;
+} GABThreadContext;
+
 void gabprofiler_begin_frame(void);
 GABProfileNode* gabprofiler_get_root(void);
 
@@ -297,38 +310,17 @@ void gabprofiler_print(void);
 #if defined(_WIN32)
     #include <windows.h>
     static LARGE_INTEGER s_Frequency;
-#elif defined(__APPLE__)
-    #include <mach/mach_time.h>
-#else
+    static INIT_ONCE g_once = INIT_ONCE_STATIC_INIT;
+    static CRITICAL_SECTION g_mutex;
+#elif defined(__APPLE__) || defined(__linux__)
+    #include <pthread.h>
     #include <time.h>
+    static pthread_once_t g_once = PTHREAD_ONCE_INIT;
+    static pthread_mutex_t g_mutex;
 #endif
 
-static double gab_time_ms(void)
-{
-#if defined(_WIN32)
-    LARGE_INTEGER t;
-    QueryPerformanceCounter(&t);
-    return (double)t.QuadPart * 1000.0 / (double)s_Frequency.QuadPart;
-
-#elif defined(__APPLE__)
-    static mach_timebase_info_data_t timebase;
-    static int init = 0;
-
-    if (!init)
-    {
-        mach_timebase_info(&timebase);
-        init = 1;
-    }
-
-    uint64_t t = mach_absolute_time();
-    return (double)t * timebase.numer / timebase.denom / 1e6;
-
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
-#endif
-}
+static GABThreadContext* g_threads[GAB_MAX_THREADS];
+static int g_threadCount = 0;
 
 #if defined(_MSC_VER)
     #define GAB_THREAD_LOCAL __declspec(thread)
@@ -336,35 +328,73 @@ static double gab_time_ms(void)
     #define GAB_THREAD_LOCAL __thread
 #endif
 
-#define GAB_MAX_NODES 2048
-
-typedef struct
-{
-    GABProfileNode nodes[GAB_MAX_NODES];
-    uint32_t nodeCount;
-
-    GABProfileNode* current;
-    GABProfileNode* firstRoot;
-    GABProfileNode* lastRoot;
-} GABThreadContext;
-
 GAB_THREAD_LOCAL static GABThreadContext g_ctx;
+GAB_THREAD_LOCAL static int g_registered = 0;
 
-static int g_initialized = 0;
+static double gab_time_ms(void)
+{
+#if defined(_WIN32)
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    return (double)t.QuadPart * 1000.0 / (double)s_Frequency.QuadPart;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+#endif
+}
+
+#if defined(_WIN32)
+BOOL CALLBACK gabprofiler_init_once(PINIT_ONCE InitOnce, PVOID Param, PVOID* Context)
+{
+    QueryPerformanceFrequency(&s_Frequency);
+    InitializeCriticalSection(&g_mutex);
+    return TRUE;
+}
+#else
+void gabprofiler_init_once(void)
+{
+    pthread_mutex_init(&g_mutex, NULL);
+}
+#endif
 
 static void gabprofiler_init(void)
 {
-    if (g_initialized) return;
-    g_initialized = 1;
+#if defined(_WIN32)
+    InitOnceExecuteOnce(&g_once, gabprofiler_init_once, NULL, NULL);
+#else
+    pthread_once(&g_once, gabprofiler_init_once);
+#endif
+}
+
+static void gabprofiler_register_thread(void)
+{
+    if (g_registered) return;
+    g_registered = 1;
+
+    gabprofiler_init();
 
 #if defined(_WIN32)
-    QueryPerformanceFrequency(&s_Frequency);
+    EnterCriticalSection(&g_mutex);
+#else
+    pthread_mutex_lock(&g_mutex);
+#endif
+
+    if (g_threadCount < GAB_MAX_THREADS)
+    {
+        g_threads[g_threadCount++] = &g_ctx;
+    }
+
+#if defined(_WIN32)
+    LeaveCriticalSection(&g_mutex);
+#else
+    pthread_mutex_unlock(&g_mutex);
 #endif
 }
 
 void gabprofiler_begin_frame(void)
 {
-    gabprofiler_init();
+    gabprofiler_register_thread();
 
     g_ctx.nodeCount = 0;
     g_ctx.current = NULL;
@@ -382,24 +412,12 @@ GABProfilerScope gabprofiler_begin(const char* name)
     if (parent)
     {
         for (GABProfileNode* c = parent->firstChild; c; c = c->nextSibling)
-        {
-            if (c->name == name)
-            {
-                node = c;
-                break;
-            }
-        }
+            if (c->name == name) { node = c; break; }
     }
     else
     {
         for (GABProfileNode* r = g_ctx.firstRoot; r; r = r->nextSibling)
-        {
-            if (r->name == name)
-            {
-                node = r;
-                break;
-            }
-        }
+            if (r->name == name) { node = r; break; }
     }
 
     if (!node)
@@ -422,9 +440,7 @@ GABProfilerScope gabprofiler_begin(const char* name)
         if (parent)
         {
             if (!parent->firstChild)
-            {
                 parent->firstChild = parent->lastChild = node;
-            }
             else
             {
                 parent->lastChild->nextSibling = node;
@@ -434,9 +450,7 @@ GABProfilerScope gabprofiler_begin(const char* name)
         else
         {
             if (!g_ctx.firstRoot)
-            {
                 g_ctx.firstRoot = g_ctx.lastRoot = node;
-            }
             else
             {
                 g_ctx.lastRoot->nextSibling = node;
@@ -449,7 +463,6 @@ GABProfilerScope gabprofiler_begin(const char* name)
 
     scope.node = node;
     scope.start = gab_time_ms();
-
     return scope;
 }
 
@@ -461,11 +474,6 @@ void gabprofiler_end(GABProfilerScope* scope)
     scope->node->cpuTime += (float)(end - scope->start);
 
     g_ctx.current = scope->node->parent;
-}
-
-GABProfileNode* gabprofiler_get_root(void)
-{
-    return g_ctx.firstRoot;
 }
 
 static void gabprofiler_print_node(GABProfileNode* node, int depth)
@@ -481,11 +489,29 @@ static void gabprofiler_print_node(GABProfileNode* node, int depth)
 
 void gabprofiler_print(void)
 {
-    for (GABProfileNode* n = g_ctx.firstRoot; n; n = n->nextSibling)
-        gabprofiler_print_node(n, 0);
+#if defined(_WIN32)
+    EnterCriticalSection(&g_mutex);
+#else
+    pthread_mutex_lock(&g_mutex);
+#endif
+
+    for (int i = 0; i < g_threadCount; i++)
+    {
+        printf("\n=== Thread %d ===\n", i);
+
+        GABThreadContext* ctx = g_threads[i];
+        for (GABProfileNode* n = ctx->firstRoot; n; n = n->nextSibling)
+            gabprofiler_print_node(n, 0);
+    }
+
+#if defined(_WIN32)
+    LeaveCriticalSection(&g_mutex);
+#else
+    pthread_mutex_unlock(&g_mutex);
+#endif
 }
 
-#endif /* GABPROFILER_IMPLEMENTATION */
+#endif
 
 #ifdef __cplusplus
 }

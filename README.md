@@ -1,7 +1,3 @@
-# GABDEBUG — Logging + Profiling Single-Header Library
-
----
-
 ## 📝 Logging
 
 * Multiple log levels (TRACE → CRITICAL)
@@ -17,8 +13,6 @@
 * Scoped profiling macros
 * Frame-based system (no GPU stalls)
 * Automatic lazy initialization
-
----
 
 # 📦 Installation
 
@@ -57,8 +51,6 @@ Enable shorter macros:
 #define GABPROFILER_STRIP_PREFIX
 ```
 
----
-
 # Logging Usage
 
 ```c
@@ -81,8 +73,6 @@ GAB_ASSERT(!x, "Assertion failed: %d is false, x);
 ```c
 GABDEBUG_set_level(LOG_WARN);
 ```
-
----
 
 # ⏱ Profiler Usage
 
@@ -116,8 +106,6 @@ Requirements:
 * Results appear after a few frames (latency buffering)
 
 
----
-
 ## Example Output
 
 ```text
@@ -125,8 +113,6 @@ Frame: CPU 16.42 ms | GPU 14.87 ms
 Update: CPU 5.10 ms | GPU 0.00 ms
 Render: CPU 11.20 ms | GPU 14.80 ms
 ```
-
----
 
 # 🔁 Profiler Architecture
 
@@ -145,14 +131,10 @@ This avoids GPU stalls and keeps performance consistent.
 #define gabQUERY_LATENCY 3
 ```
 
----
-
 # 🔒 Thread Safety
 
 * Logging: ✅ thread-safe
 * Profiler: ⚠️ single-threaded
-
----
 
 # ⚠️ Notes
 
@@ -160,8 +142,6 @@ This avoids GPU stalls and keeps performance consistent.
 * CPU work must not be optimized away (use `volatile`)
 * Always profile in **Release mode**
 * GPU timing requires actual draw calls
-
----
 
 # 🛠 Future Improvements
 
