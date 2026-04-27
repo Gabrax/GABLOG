@@ -1,14 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+project(gabdebug)
 
-project(app)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp")
-set(PROJECT_INCLUDE "${CMAKE_CURRENT_LIST_DIR}/src/")
-
-add_executable(${PROJECT_NAME})
-target_sources(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_INCLUDE})
+cmake_policy(SET CMP0069 NEW)
+add_library(${PROJECT_NAME} STATIC)
+target_sources(${PROJECT_NAME} PRIVATE "gabdebug.c")
+target_include_directories(${PROJECT_NAME} PUBLIC "gabdebug.h")

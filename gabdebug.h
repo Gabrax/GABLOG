@@ -366,7 +366,7 @@ typedef struct
 {
     const char* name;
     float cpuTime;
-#ifdef GAB_GL
+#ifdef GABPROFILER_GL
     GLuint query;
 #endif
     int hasQuery;
@@ -375,15 +375,15 @@ typedef struct
 #define GABMAX_QUERIES_PER_FRAME 256
 #define GABQUERY_LATENCY 3
 
-static uint32_t s_CurrentFrame = 0;
-static uint32_t s_QueryIndex = 0;
+static unsigned int s_CurrentFrame = 0;
+static unsigned int s_QueryIndex = 0;
 
-#ifdef GAB_GL
+#ifdef GABPROFILER_GL
 static GLuint s_QueryPool[GABQUERY_LATENCY][GABMAX_QUERIES_PER_FRAME];
 #endif
 
 static GPUQueryData s_FrameQueries[GABQUERY_LATENCY][GABMAX_QUERIES_PER_FRAME];
-static uint32_t s_FrameQueryCounts[GABQUERY_LATENCY];
+static unsigned int s_FrameQueryCounts[GABQUERY_LATENCY];
 
 static double gab_time_ms(void)
 {

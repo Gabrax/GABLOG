@@ -23,7 +23,7 @@ Example Output:
 To disable logging less than specified alert level, use this function:
 
 ```c
-GABDEBUG_set_level(LOG_WARN);
+void gablog_set_level(LogLevel level);
 ```
 
 <div align="center">
