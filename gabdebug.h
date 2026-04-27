@@ -32,6 +32,8 @@ void gablog_log(LogLevel level, const char* file, int line, const char* fmt, ...
 
 #if defined(_MSC_VER)
     #define DEBUG_BREAK() __debugbreak()
+#elif defined(__GNUC__) || defined(__clang__)
+    #define DEBUG_BREAK() __builtin_trap()
 #else
     #include <signal.h>
     #define DEBUG_BREAK() raise(SIGTRAP)
@@ -154,7 +156,7 @@ static void gablog_init_terminal(void)
 #endif
 }
 
-static inline const char* gablog_strip_filename(const char* path)
+static const char* gablog_strip_filename(const char* path)
 {
     const char* slash = strrchr(path, '/');
 
@@ -266,10 +268,10 @@ typedef struct GABProfileNode
     unsigned int query[3];
 #endif
 
-    GABProfileNode* parent;
-    GABProfileNode* firstChild;
-    GABProfileNode* lastChild;
-    GABProfileNode* nextSibling;
+    struct GABProfileNode* parent;
+    struct GABProfileNode* firstChild;
+    struct GABProfileNode* lastChild;
+    struct GABProfileNode* nextSibling;
 } GABProfileNode;
 
 #define GAB_MAX_NODES 2048
@@ -353,7 +355,7 @@ void gabprofiler_print(void);
 static GABThreadContext* g_threads[GAB_MAX_THREADS];
 static int g_threadCount = 0;
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     #define GAB_THREAD_LOCAL __declspec(thread)
 #else
     #define GAB_THREAD_LOCAL __thread
