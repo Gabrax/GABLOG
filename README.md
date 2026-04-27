@@ -12,16 +12,18 @@ GABLOG_ERROR("Error occurred");
 GABLOG_ASSERT(!x, "Assertion failed: %d is false, x);
 ```
 
-<div align="center">
-
-### Output
-
-</div>
+Example Output:
 
 ```text
 [INFO] Hello world (main.c:10)
 [WARN] Warning! (main.c:11)
 [ERROR] Error occurred (main.c:12)
+```
+
+To disable logging less than specified alert level, use this function:
+
+```c
+GABDEBUG_set_level(LOG_WARN);
 ```
 
 <div align="center">
@@ -44,21 +46,7 @@ for (;;)
 }
 ```
 
-Enable OpenGL support:
-
-```c
-#define GAB_GL
-#include <glad/glad.h>
-```
-
-Requirements:
-
-* OpenGL context must be initialized
-* Uses `GL_TIME_ELAPSED` queries
-* Results appear after a few frames (latency buffering)
-
-
-Example Output
+Example Output:
 
 ```text
 Frame: CPU 16.42 ms | GPU 14.87 ms
@@ -67,7 +55,7 @@ Render: CPU 11.20 ms | GPU 14.80 ms
 ```
 
 
-The profiler is **frame-based**:
+The profiler is frame-based, which avoids GPU stalls and keeps performance consistent.
 
 ```text
 Frame N     → record timings
@@ -75,11 +63,11 @@ Frame N+1   → GPU processing
 Frame N+2   → resolve results
 ```
 
-This avoids GPU stalls and keeps performance consistent.
+Adjust these macros to your needs:
 
 ```c
-#define gabMAX_QUERIES_PER_FRAME 256
-#define gabQUERY_LATENCY 3
+#define GABMAX_QUERIES_PER_FRAME 256
+#define GABQUERY_LATENCY 3
 ```
 
 <div align="center">
@@ -88,7 +76,7 @@ This avoids GPU stalls and keeps performance consistent.
 
 </div>
 
-1. Copy `GABDEBUG.h` into your project
+1. Copy `gabdebug.h` into your project
 
 2. In **one** source file:
 
@@ -104,34 +92,24 @@ This avoids GPU stalls and keeps performance consistent.
 #include "gabdebug.h"
 ```
 
-<div align="center">
-
-### Enable / Disable systems
-
-</div>
+Libraries are enabled by default. You can enable or disable them using the following macros.
 
 ```c
-#define GABDEBUG_ENABLE 0
-#define GABPROFILER_ENABLE 0
+#define GABDEBUG_ENABLE false
+#define GABPROFILER_ENABLE false
 ```
 
-* Completely removes code at compile time
-* Zero runtime cost
-
-<div align="center">
-
-### Prefix Stripping (Optional)
-
-</div>
-
-Enable shorter macros:
+To enable GPU profiling, select the graphics API you are using:
 
 ```c
-#define GABDEBUG_STRIP_PREFIX
-#define GABPROFILER_STRIP_PREFIX
+#define GAB_GL
+```
+
+Stripped-prefix versions are enabled by default. In case of naming conflicts, use the following defines:
+
+```c
+#define GABDEBUG_UNSTRIP_PREFIX
+#define GABPROFILER_UNSTRIP_PREFIX
 ```
 
 
-```c
-GABDEBUG_set_level(LOG_WARN);
-```
